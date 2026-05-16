@@ -1,0 +1,276 @@
+classdef app1 < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure                    matlab.ui.Figure
+        TabGroup                    matlab.ui.container.TabGroup
+        uploadSampleFileTab         matlab.ui.container.Tab
+        ChooseFileButton            matlab.ui.control.Button
+        UploadtheECGFileincsvformateLabel  matlab.ui.control.Label
+        DatainFrequencyandtimedomainPanel  matlab.ui.container.Panel
+        UIAxes                      matlab.ui.control.UIAxes
+        UIAxes2                     matlab.ui.control.UIAxes
+        RequiredoperationPanel      matlab.ui.container.Panel
+        PlotthedataButton           matlab.ui.control.Button
+        ComputethecharacteristicsofthedataButton  matlab.ui.control.Button
+        DatainFrequencyandtimedomainPanel_2  matlab.ui.container.Panel
+        UIAxes_2                    matlab.ui.control.UIAxes
+        UIAxes2_2                   matlab.ui.control.UIAxes
+        SignalCharacteristicsPanel  matlab.ui.container.Panel
+        MeanLabel                   matlab.ui.control.Label
+        ValueLabel                  matlab.ui.control.Label
+        MedianLabel                 matlab.ui.control.Label
+        VarianceLabel               matlab.ui.control.Label
+        ValueLabel_2                matlab.ui.control.Label
+        ValueLabel_3                matlab.ui.control.Label
+    end
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Code that executes after component creation
+        function startupFcn(app)
+            
+        end
+
+        % Button pushed function: ChooseFileButton
+        function ChooseFileButtonPushed(app, event)
+        global data;
+        [filename, filepath] = uigetfile('*.csv', 'Select CSV file');
+        
+        % Check if a file was selected
+        if isequal(filename, 0)
+            disp('No file selected.');
+            return;
+        end
+        
+        % Read data from the CSV file
+        data = readmatrix(fullfile(filepath, filename));
+        end
+
+        % Button pushed function: PlotthedataButton
+        function PlotthedataButtonPushed(app, event)
+           global data;
+           global fs;
+           global t;
+           fs = 1000;  % Sample rate (replace with your actual sample rate)
+            t = (0:length(data)-1) / fs;  % Time vector
+            plot(app.UIAxes,t,data)
+            xlabel(app.UIAxes,'Time (s)');
+            ylabel(app.UIAxes,'Amplitude');
+            title(app.UIAxes,'ECG Signal - Time Domain');
+            Y = fft(data);
+            N = length(data);
+            f = (0:N-1) * (fs / N);  % Frequency vector
+            P = abs(Y).^2 / N;  % Power spectrum
+            plot(app.UIAxes2,f, P);
+            xlabel(app.UIAxes2,'Frequency (Hz)');
+            ylabel(app.UIAxes2,'Power');
+            title(app.UIAxes2,'ECG Signal - Frequency Domain');
+            xlim(app.UIAxes2,[0 100])
+        end
+
+        % Button pushed function: 
+        % ComputethecharacteristicsofthedataButton
+        function ComputethecharacteristicsofthedataButtonPushed(app, event)
+            global fs;
+            global data;
+            global t;
+            order = 4;  % Filter order
+            cutoff_freq = 50;  % Cutoff frequency in Hz
+            [b_butter, a_butter] = butter(order, cutoff_freq / (fs/2));
+            filtered_butter = filtfilt(b_butter, a_butter, data);
+            mean_filtered = mean(filtered_butter);
+            median_filtered = median(filtered_butter);
+            variance_filtered = var(filtered_butter);
+            window = hamming(length(data));
+            [Pxx_original, f_original] = periodogram(data, window, [], fs, 'onesided');
+            [Pxx_filtered, f_filtered] = periodogram(filtered_butter, window, [], fs, 'onesided');
+            plot(app.UIAxes2_2,t, filtered_butter);
+            title(app.UIAxes2_2,'Filtered (Butterworth)');
+            ylabel(app.UIAxes2_2,'Amplitude');
+            xlabel(app.UIAxes2_2,'Time (s)');
+            plot(app.UIAxes_2,f_original, 10*log10(Pxx_original));
+            title(app.UIAxes_2,'Spectral Characteristics (Original)');
+            ylabel(app.UIAxes_2,'Power (dB)');
+            xlabel(app.UIAxes_2,'Frequency (Hz)');
+            app.ValueLabel.Text=sprintf('%.2f',  mean_filtered)
+            app.ValueLabel_2.Text=sprintf('%.2f',  median_filtered)
+            app.ValueLabel_3.Text=sprintf('%.2f',  variance_filtered)
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure and hide until all components are created
+            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.Color = [0 0 1];
+            app.UIFigure.Position = [100 100 1131 617];
+            app.UIFigure.Name = 'MATLAB App';
+
+            % Create TabGroup
+            app.TabGroup = uitabgroup(app.UIFigure);
+            app.TabGroup.Position = [24 468 231 125];
+
+            % Create uploadSampleFileTab
+            app.uploadSampleFileTab = uitab(app.TabGroup);
+            app.uploadSampleFileTab.Title = 'upload Sample File';
+            app.uploadSampleFileTab.BackgroundColor = [1 0.4118 0.1608];
+
+            % Create ChooseFileButton
+            app.ChooseFileButton = uibutton(app.uploadSampleFileTab, 'push');
+            app.ChooseFileButton.ButtonPushedFcn = createCallbackFcn(app, @ChooseFileButtonPushed, true);
+            app.ChooseFileButton.BackgroundColor = [0 1 0];
+            app.ChooseFileButton.Position = [73 18 80 27];
+            app.ChooseFileButton.Text = 'Choose File';
+
+            % Create UploadtheECGFileincsvformateLabel
+            app.UploadtheECGFileincsvformateLabel = uilabel(app.uploadSampleFileTab);
+            app.UploadtheECGFileincsvformateLabel.Position = [15 61 195 22];
+            app.UploadtheECGFileincsvformateLabel.Text = 'Upload the ECG File in csv formate';
+
+            % Create DatainFrequencyandtimedomainPanel
+            app.DatainFrequencyandtimedomainPanel = uipanel(app.UIFigure);
+            app.DatainFrequencyandtimedomainPanel.Title = 'Data in Frequency and time domain';
+            app.DatainFrequencyandtimedomainPanel.BackgroundColor = [0 1 1];
+            app.DatainFrequencyandtimedomainPanel.FontWeight = 'bold';
+            app.DatainFrequencyandtimedomainPanel.FontSize = 14;
+            app.DatainFrequencyandtimedomainPanel.Position = [275 35 404 558];
+
+            % Create UIAxes
+            app.UIAxes = uiaxes(app.DatainFrequencyandtimedomainPanel);
+            title(app.UIAxes, 'Time domain')
+            xlabel(app.UIAxes, 'X')
+            ylabel(app.UIAxes, 'Y')
+            zlabel(app.UIAxes, 'Z')
+            app.UIAxes.Position = [25 282 353 237];
+
+            % Create UIAxes2
+            app.UIAxes2 = uiaxes(app.DatainFrequencyandtimedomainPanel);
+            title(app.UIAxes2, 'Frequency domain')
+            xlabel(app.UIAxes2, 'X')
+            ylabel(app.UIAxes2, 'Y')
+            zlabel(app.UIAxes2, 'Z')
+            app.UIAxes2.Position = [25 29 353 240];
+
+            % Create RequiredoperationPanel
+            app.RequiredoperationPanel = uipanel(app.UIFigure);
+            app.RequiredoperationPanel.Title = 'Required operation';
+            app.RequiredoperationPanel.BackgroundColor = [1 0.4118 0.1608];
+            app.RequiredoperationPanel.FontWeight = 'bold';
+            app.RequiredoperationPanel.FontSize = 14;
+            app.RequiredoperationPanel.Position = [23 250 221 181];
+
+            % Create PlotthedataButton
+            app.PlotthedataButton = uibutton(app.RequiredoperationPanel, 'push');
+            app.PlotthedataButton.ButtonPushedFcn = createCallbackFcn(app, @PlotthedataButtonPushed, true);
+            app.PlotthedataButton.BackgroundColor = [0 1 0];
+            app.PlotthedataButton.Position = [66 99 83 27];
+            app.PlotthedataButton.Text = 'Plot the data';
+
+            % Create ComputethecharacteristicsofthedataButton
+            app.ComputethecharacteristicsofthedataButton = uibutton(app.RequiredoperationPanel, 'push');
+            app.ComputethecharacteristicsofthedataButton.ButtonPushedFcn = createCallbackFcn(app, @ComputethecharacteristicsofthedataButtonPushed, true);
+            app.ComputethecharacteristicsofthedataButton.BackgroundColor = [0 1 0];
+            app.ComputethecharacteristicsofthedataButton.Position = [30 23 156 46];
+            app.ComputethecharacteristicsofthedataButton.Text = {'Compute the characteristics'; ' of the data'};
+
+            % Create DatainFrequencyandtimedomainPanel_2
+            app.DatainFrequencyandtimedomainPanel_2 = uipanel(app.UIFigure);
+            app.DatainFrequencyandtimedomainPanel_2.Title = 'Data in Frequency and time domain';
+            app.DatainFrequencyandtimedomainPanel_2.BackgroundColor = [0 1 1];
+            app.DatainFrequencyandtimedomainPanel_2.FontWeight = 'bold';
+            app.DatainFrequencyandtimedomainPanel_2.FontSize = 14;
+            app.DatainFrequencyandtimedomainPanel_2.Position = [708 34 404 558];
+
+            % Create UIAxes_2
+            app.UIAxes_2 = uiaxes(app.DatainFrequencyandtimedomainPanel_2);
+            title(app.UIAxes_2, 'Spectrum')
+            xlabel(app.UIAxes_2, 'X')
+            ylabel(app.UIAxes_2, 'Y')
+            zlabel(app.UIAxes_2, 'Z')
+            app.UIAxes_2.Position = [25 282 353 237];
+
+            % Create UIAxes2_2
+            app.UIAxes2_2 = uiaxes(app.DatainFrequencyandtimedomainPanel_2);
+            title(app.UIAxes2_2, 'Frequency domain')
+            xlabel(app.UIAxes2_2, 'X')
+            ylabel(app.UIAxes2_2, 'Y')
+            zlabel(app.UIAxes2_2, 'Z')
+            app.UIAxes2_2.Position = [25 29 353 240];
+
+            % Create SignalCharacteristicsPanel
+            app.SignalCharacteristicsPanel = uipanel(app.UIFigure);
+            app.SignalCharacteristicsPanel.Title = 'Signal Characteristics';
+            app.SignalCharacteristicsPanel.BackgroundColor = [1 0.4118 0.1608];
+            app.SignalCharacteristicsPanel.FontWeight = 'bold';
+            app.SignalCharacteristicsPanel.FontSize = 14;
+            app.SignalCharacteristicsPanel.Position = [27 65 216 158];
+
+            % Create MeanLabel
+            app.MeanLabel = uilabel(app.SignalCharacteristicsPanel);
+            app.MeanLabel.Position = [12 96 76 31];
+            app.MeanLabel.Text = 'Mean ';
+
+            % Create ValueLabel
+            app.ValueLabel = uilabel(app.SignalCharacteristicsPanel);
+            app.ValueLabel.Position = [94 97 83 27];
+            app.ValueLabel.Text = 'Value';
+
+            % Create MedianLabel
+            app.MedianLabel = uilabel(app.SignalCharacteristicsPanel);
+            app.MedianLabel.Position = [10 56 81 40];
+            app.MedianLabel.Text = 'Median ';
+
+            % Create VarianceLabel
+            app.VarianceLabel = uilabel(app.SignalCharacteristicsPanel);
+            app.VarianceLabel.Position = [10 17 85 40];
+            app.VarianceLabel.Text = 'Variance ';
+
+            % Create ValueLabel_2
+            app.ValueLabel_2 = uilabel(app.SignalCharacteristicsPanel);
+            app.ValueLabel_2.Position = [94 63 83 27];
+            app.ValueLabel_2.Text = 'Value';
+
+            % Create ValueLabel_3
+            app.ValueLabel_3 = uilabel(app.SignalCharacteristicsPanel);
+            app.ValueLabel_3.Position = [99 24 83 27];
+            app.ValueLabel_3.Text = 'Value';
+
+            % Show the figure after all components are created
+            app.UIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = app1
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            % Execute the startup function
+            runStartupFcn(app, @startupFcn)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end

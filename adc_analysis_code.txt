@@ -1,0 +1,104 @@
+% =========================================================
+% ADC Bit Analysis — Time Domain & FFT Spectrum
+% =========================================================
+% Reads an 8-bit ADC CSV file, reconstructs the analog
+% voltage, plots the signal in time domain, then computes
+% and plots the FFT spectrum (normalized, dB scale).
+%
+% File format expected:
+%   8 columns → b7 b6 b5 b4 b3 b2 b1 b0  (MSB to LSB)
+% =========================================================
+
+clc;
+clear;
+close all;
+
+% ---------------------------------------------------------
+% 1. Parameters
+% ---------------------------------------------------------
+filename  = 'adc_bits.CSV';
+Vref      = 10e-6;          % Reference voltage (V)
+fs        = 20480;          % Sampling frequency (Hz)
+fin       = 100;            % Input sine frequency (Hz)
+numHarm   = 5;              % Number of harmonics for THD
+eps       = 1e-12;          % Small offset to avoid log(0)
+
+% ---------------------------------------------------------
+% 2. Load Data
+% ---------------------------------------------------------
+data = readmatrix(filename);
+
+% Extract each bit column (b7 = MSB, b0 = LSB)
+b7 = data(:, 1);
+b6 = data(:, 2);
+b5 = data(:, 3);
+b4 = data(:, 4);
+b3 = data(:, 5);
+b2 = data(:, 6);
+b1 = data(:, 7);
+b0 = data(:, 8);
+
+% ---------------------------------------------------------
+% 3. Convert Bits to Analog Voltage
+% ---------------------------------------------------------
+% Reconstruct the decimal code from binary bits
+code    = b7*128 + b6*64 + b5*32 + b4*16 + b3*8 + b2*4 + b1*2 + b0;
+
+% Scale to voltage using reference
+voltage = code * Vref / 255;
+
+% ---------------------------------------------------------
+% 4. Time Vector & Basic Info
+% ---------------------------------------------------------
+N    = length(voltage);
+Ts   = 1 / fs;
+time = (0:N-1) / fs;
+
+fprintf('Number of samples = %d\n', N);
+fprintf('Ts = %.3e s\n',  Ts);
+fprintf('Fs = %.3f Hz\n', fs);
+
+% ---------------------------------------------------------
+% 5. Time-Domain Plot
+% ---------------------------------------------------------
+figure('Name', 'Time Domain Signal');
+plot(time, voltage, 'LineWidth', 1.2);
+grid on;
+xlabel('Time (s)');
+ylabel('Voltage (V)');
+title('ADC Signal — Time Domain');
+
+% ---------------------------------------------------------
+% 6. Remove DC Component Before FFT
+% ---------------------------------------------------------
+x = voltage - mean(voltage);
+
+% ---------------------------------------------------------
+% 7. FFT with Rectangular Window
+% ---------------------------------------------------------
+w  = ones(N, 1);        % Rectangular window (narrowest main lobe)
+xw = x .* w;
+
+% Zero-pad to next power of 2 for denser FFT display
+Nfft = 8 * 2^nextpow2(N);
+X    = fft(xw, Nfft);
+
+% Compute single-sided power spectrum
+P2 = abs(X / sum(w)).^2;
+P1 = P2(1:Nfft/2+1);
+P1(2:end-1) = 2 * P1(2:end-1);    % Double to account for folded half
+
+% Frequency axis
+f = (0:Nfft/2) * fs / Nfft;
+
+% ---------------------------------------------------------
+% 8. FFT Spectrum Plot
+% ---------------------------------------------------------
+figure('Name', 'FFT Spectrum');
+plot(f, 10*log10(P1 / max(P1) + eps), 'LineWidth', 1.2);
+grid on;
+xlabel('Frequency (Hz)');
+ylabel('Magnitude (dB, normalized)');
+title('ADC Signal — FFT Spectrum');
+xlim([0, min(1000, fs/2)]);
+ylim([-120, 5]);
