@@ -53,7 +53,7 @@ classdef app1 < matlab.apps.AppBase
            global data;
            global fs;
            global t;
-           fs = 1000;  % Sample rate (replace with your actual sample rate)
+           fs = 1000;  % Sample rate 
             t = (0:length(data)-1) / fs;  % Time vector
             plot(app.UIAxes,t,data)
             xlabel(app.UIAxes,'Time (s)');
